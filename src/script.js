@@ -3,14 +3,86 @@ import * as THREE from "three";
 //fetch the canvas where the animation lives
 const canvas = document.getElementsByClassName("webgl")[0];
 
+//build the scene
+const scene = new THREE.Scene();
+
 //set sizes for later
 const sizes = {
   width: window.innerWidth,
   height: window.innerHeight,
 };
 
-//build the scene
-const scene = new THREE.Scene();
+//create object that will be seen on the scene:
+const geometry = new THREE.SphereGeometry(0.5, 20, 20);
+
+const colors = ["red", "green", "blue"];
+
+//object 1
+const ob1 = new THREE.Mesh(
+  geometry,
+  new THREE.MeshBasicMaterial({
+    color: "blue",
+  })
+);
+ob1.position.set(-2, 0, 0);
+
+//object 2
+const ob2 = new THREE.Mesh(
+  geometry,
+  new THREE.MeshBasicMaterial({
+    color: "red",
+  })
+);
+ob2.scale.set(0.5, 0.5);
+
+ob2.position.set(2, 0, 0);
+
+//object 3
+const ob3 = new THREE.Mesh(
+  geometry,
+  new THREE.MeshBasicMaterial({
+    color: "yellow",
+  })
+);
+
+scene.add(ob1, ob2, ob3);
+
+// for (let i = 0; i < 12; i++) {
+//   const colorIndex = (i + 3) % 3;
+//   const material = new THREE.MeshBasicMaterial({
+//     color: colors[colorIndex],
+//   });
+//   const sphere = new THREE.Mesh(geometry, material);
+
+//   sphere.position.set(
+//     (colorIndex + Math.random()) *
+//       Math.random() *
+//       Math.cos(colorIndex * Math.PI * i),
+//     (colorIndex + Math.random()) *
+//       colorIndex *
+//       Math.random() *
+//       Math.sin(-colorIndex),
+//     (colorIndex + Math.random()) *
+//       colorIndex *
+//       Math.random() *
+//       Math.cos(colorIndex)
+//   );
+//   sphere.scale.set(
+//     (colorIndex + Math.random()) *
+//       Math.random() *
+//       Math.cos(colorIndex * Math.PI * i),
+//     (colorIndex + Math.random()) *
+//       colorIndex *
+//       Math.random() *
+//       Math.sin(-colorIndex),
+//     (colorIndex + Math.random()) *
+//       colorIndex *
+//       Math.random() *
+//       Math.cos(colorIndex)
+//   );
+//   console.log(colorIndex * Math.random() * Math.cos(colorIndex));
+//   scene.add(sphere);
+// }
 
 //set the camera
 const camera = new THREE.PerspectiveCamera(
@@ -19,6 +91,7 @@ const camera = new THREE.PerspectiveCamera(
   1,
   1000
 );
+camera.position.set(0, 0, 8);
 scene.add(camera);
 
 //get the renderer and render
