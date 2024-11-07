@@ -1,4 +1,18 @@
 import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import * as dat from "lil-gui";
+import gsap from "gsap";
+
+//-----------------GUI SETUP-----------------------//
+
+const gui = new dat.GUI({
+  width: 350,
+  title: "First app",
+});
+const torusTweaks = gui.addFolder("torusTweaks");
+torusTweaks.close();
+gui.close();
+gui.hide();
 
 //fetch the canvas where the animation lives
 const canvas = document.getElementsByClassName("webgl")[0];
@@ -12,93 +26,172 @@ const sizes = {
   height: window.innerHeight,
 };
 
-//create object that will be seen on the scene:
-const geometry = new THREE.SphereGeometry(0.5, 20, 20);
+const cursor = {
+  x: 0,
+  y: 0,
+};
 
-const colors = ["red", "green", "blue"];
+const debug = {
+  sphereColor: "red",
+  spin: () => {
+    gsap.to(group.rotation, {
+      duration: 1,
+      y: group.rotation.y + Math.PI * 2,
+    });
+  },
+  torusSubdivisions: 22,
+  torusArc: 22,
+};
 
-//object 1
-const ob1 = new THREE.Mesh(
-  geometry,
-  new THREE.MeshBasicMaterial({
-    color: "blue",
-  })
+//create objects that will be seen on the scene:
+const sphereMaterial = new THREE.MeshBasicMaterial({
+  color: debug.sphereColor,
+});
+const sphere = new THREE.Mesh(
+  new THREE.SphereGeometry(0.5, 20, 20),
+  sphereMaterial
 );
-ob1.position.set(-2, 0, 0);
 
-//object 2
-const ob2 = new THREE.Mesh(
-  geometry,
+const box = new THREE.Mesh(
+  new THREE.BoxGeometry(1, 1, 1, 4, 4),
   new THREE.MeshBasicMaterial({
     color: "red",
+    wireframe: true,
   })
 );
-ob2.scale.set(0.5, 0.5);
+box.scale.set(0.5, 0.5, 0.5);
+box.position.set(2, 0, 0);
 
-ob2.position.set(2, 0, 0);
-
-//object 3
-const ob3 = new THREE.Mesh(
-  geometry,
+const torus = new THREE.Mesh(
+  new THREE.TorusGeometry(
+    0.5,
+    0.5,
+    debug.torusSubdivisions,
+    debug.torusSubdivisions,
+    debug.torusArc
+  ),
   new THREE.MeshBasicMaterial({
     color: "yellow",
+    // wireframe: true,
   })
 );
+torus.position.setZ(-1);
 
-scene.add(ob1, ob2, ob3);
+const group = new THREE.Group();
+group.add(sphere, box, torus);
+scene.add(group);
 
-// for (let i = 0; i < 12; i++) {
-//   const colorIndex = (i + 3) % 3;
-//   const material = new THREE.MeshBasicMaterial({
-//     color: colors[colorIndex],
-//   });
-//   const sphere = new THREE.Mesh(geometry, material);
+//first tweak: position
+gui.add(group.position, "x").max(2).min(0).step(0.5).name("group-position");
 
-//   sphere.position.set(
-//     (colorIndex + Math.random()) *
-//       Math.random() *
-//       Math.cos(colorIndex * Math.PI * i),
-//     (colorIndex + Math.random()) *
-//       colorIndex *
-//       Math.random() *
-//       Math.sin(-colorIndex),
-//     (colorIndex + Math.random()) *
-//       colorIndex *
-//       Math.random() *
-//       Math.cos(colorIndex)
-//   );
-//   sphere.scale.set(
-//     (colorIndex + Math.random()) *
-//       Math.random() *
-//       Math.cos(colorIndex * Math.PI * i),
-//     (colorIndex + Math.random()) *
-//       colorIndex *
-//       Math.random() *
-//       Math.sin(-colorIndex),
-//     (colorIndex + Math.random()) *
-//       colorIndex *
-//       Math.random() *
-//       Math.cos(colorIndex)
-//   );
-//   console.log(colorIndex * Math.random() * Math.cos(colorIndex));
-//   scene.add(sphere);
-// }
+//second tweak: color
+gui
+  .addColor(debug, "sphereColor")
+  .onChange((c) => sphereMaterial.color.set(debug.sphereColor))
+  .name("sphere-color");
 
-//set the camera
+//third tweak: execute a function
+gui.add(debug, "spin").name("spin");
+
+//fourth tweak: modifiy a geomtry
+torusTweaks
+  .add(debug, "torusSubdivisions")
+  .min(10)
+  .max(90)
+  .step(10)
+  .name("torus-subdivisions")
+  .onFinishChange((a) => {
+    torus.geometry.dispose();
+    torus.geometry = new THREE.TorusGeometry(
+      0.5,
+      0.5,
+      debug.torusSubdivisions,
+      debug.torusSubdivisions,
+      debug.torusArc
+    );
+  });
+
+torusTweaks
+  .add(debug, "torusArc")
+  .min(10)
+  .max(50)
+  .step(2)
+  .name("torus-arc")
+  .onFinishChange((a) => {
+    torus.geometry.dispose();
+    torus.geometry = new THREE.TorusGeometry(
+      0.5,
+      0.5,
+      debug.torusSubdivisions,
+      debug.torusSubdivisions,
+      debug.torusArc
+    );
+  });
+gui.add(torus.material, "wireframe").name("torus-wireframe");
+
+//add a camera
 const camera = new THREE.PerspectiveCamera(
   45,
   sizes.width / sizes.height,
   1,
   1000
 );
-camera.position.set(0, 0, 8);
+camera.position.set(0, 0, 5);
 scene.add(camera);
 
 //get the renderer and render
 const renderer = new THREE.WebGLRenderer({ canvas });
 //this line adds an inline style with width and height properties for the canvas
 renderer.setSize(sizes.width, sizes.height);
-renderer.render(scene, camera);
+
+let now = Date.now();
+let clock = new THREE.Clock();
+
+//gui events
+window.addEventListener("keydown", (e) => {
+  const key = e.key;
+  if (key === "s") {
+    gui.show(gui._hidden);
+  }
+});
+
+//animation
+const tick = () => {
+  //using date object (native js)
+  const deltaNow = Date.now() - now;
+
+  //using THREE clock
+  const delta = clock.getElapsedTime();
+
+  //modify position
+  sphere.position.set(
+    0,
+    Math.cos(/*delta*/ (deltaNow * Math.PI) / 2000) * 2,
+    Math.sin(/*delta*/ (deltaNow * Math.PI) / 2000) * 2
+  );
+
+  //native js controls
+  // camera.position.set(
+  //   Math.cos(Math.PI * cursor.x * 2) * 2,
+  //   camera.position.y,
+  //   Math.sin(Math.PI * cursor.y * 2) * 2
+  // );
+  // camera.lookAt(group.position);
+
+  renderer.render(scene, camera);
+  window.requestAnimationFrame(tick);
+};
+
+tick();
+
+//controls (native js)
+window.addEventListener("mousemove", (e) => {
+  cursor.x = e.clientX / sizes.width - 0.5;
+  cursor.y = -(e.clientY / sizes.height - 0.5);
+  // console.log(cursor);
+});
+
+const controls = new OrbitControls(camera, canvas);
 
 //resize support
 window.addEventListener("resize", () => {
