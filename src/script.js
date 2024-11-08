@@ -1,9 +1,12 @@
 import * as THREE from "three";
+import { FontLoader } from "three/examples/jsm/loaders/FontLoader.js";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+//import typefaceFont from "three/examples/fonts/helvetiker_regular.typeface.json";
+import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
 import * as dat from "lil-gui";
 import gsap from "gsap";
 
-//-----------------GUI SETUP-----------------------//
+//-----------------GUI SETUP[BEGIN]-----------------------//
 
 const gui = new dat.GUI({
   width: 350,
@@ -13,6 +16,8 @@ const torusTweaks = gui.addFolder("torusTweaks");
 torusTweaks.close();
 gui.close();
 gui.hide();
+
+//-----------------GUI SETUP[END]--------------------------//
 
 //fetch the canvas where the animation lives
 const canvas = document.getElementsByClassName("webgl")[0];
@@ -41,11 +46,145 @@ const debug = {
   },
   torusSubdivisions: 22,
   torusArc: 22,
+  textColor: "purple",
+  textPosition: 0,
 };
 
+//-------------------LIGHTS[BEGIN]---------------//
+const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+scene.add(ambientLight);
+
+const pointLight = new THREE.PointLight(0xffffff, 30);
+pointLight.position.x = 2;
+pointLight.position.y = 3;
+pointLight.position.z = 4;
+scene.add(pointLight);
+//-------------------LIGHTS[END]-----------------//
+
+//-------------------TEXTURES[BEGIN]-------------//
+
+const txLoader = new THREE.TextureLoader(/*loader manager goes here*/);
+const matCapTexture = txLoader.load("/matcaps/5.png");
+matCapTexture.colorSpace = THREE.SRGBColorSpace;
+//const metalnessTexture =
+const gradientMap = txLoader.load(
+  "/gradients/5.jpg",
+  (a) => {
+    console.log(a);
+  },
+  (b) => {
+    console.log(b);
+  },
+  (e) => {
+    console.log(e);
+  }
+);
+//gradientMap.colorSpace = THREE.SRGBColorSpace;
+
+//-------------------TEXTURES[END]---------------//
+
+//-------------------TEXT[BEGIN]-----------------//
+const textLoader = new FontLoader();
+
+textLoader.load("/helvetiker_regular.typeface.json", (font) => {
+  const geomConfig = {
+    font,
+    size: 0.5,
+    height: 0.2,
+    curveSegments: 12,
+  };
+
+  //basic
+  const basic = new THREE.Mesh(
+    new TextGeometry("Basic", geomConfig),
+    new THREE.MeshBasicMaterial({
+      color: debug.textColor,
+    })
+  );
+
+  //color tweak
+  gui
+    .addColor(debug, "textColor")
+    .name("text-color")
+    .onChange((c) => basic.material.color.set(debug.textColor));
+
+  //position tweak
+  gui.add(basic.position, "x").min(-1).max(1).step(0.1).name("text-position");
+
+  //normal
+  const normal = new THREE.Mesh(
+    new TextGeometry("Normal", geomConfig),
+    new THREE.MeshNormalMaterial({
+      //color: "blue",
+      transparent: true,
+      opacity: 0.5,
+    })
+  );
+
+  //matcap
+  const matCap = new THREE.Mesh(
+    new TextGeometry("MatCap", geomConfig),
+    new THREE.MeshMatcapMaterial({
+      matcap: matCapTexture,
+      //color: "orange",
+    })
+  );
+
+  const matCapObject = new THREE.Mesh(
+    new THREE.SphereGeometry(0.5, 22, 22),
+    new THREE.MeshMatcapMaterial({
+      matcap: matCapTexture,
+    })
+  );
+
+  matCapObject.position.set(3, 0, 0);
+
+  const matCapGroup = new THREE.Group();
+  matCapGroup.add(matCap, matCapObject);
+
+  //re position everything
+  basic.position.set(-6, 1, 0);
+  normal.position.set(-6, -1, 0);
+  matCapGroup.position.set(-6, 0, 0);
+
+  //add text to scene
+  scene.add(basic, normal, matCapGroup);
+});
+
+//------light reacting------------//
+//lambert
+//phong
+//toon
+
+//--------PBR------------------------//
+//standard
+//physical
+
+//-------------------TEXT[END]--------------------//
+
+//----------------CUSTOM GEOMETRY[START]-----------//
+
+//create attribute
+const attribute = new THREE.BufferAttribute(
+  new Float32Array([0, -1, -1, 1, 1, 1, 2, -2, -1.5]),
+  3
+);
+//use buffer geometry
+const customGeometry = new THREE.BufferGeometry();
+customGeometry.setAttribute("position", attribute);
+const cg_material = new THREE.MeshBasicMaterial({
+  color: "pink",
+  side: THREE.DoubleSide,
+});
+const cg_mesh = new THREE.Mesh(customGeometry, cg_material);
+scene.add(cg_mesh);
+
+//----------------CUSTOM GEOMETRY[END]-------------//
+
 //create objects that will be seen on the scene:
-const sphereMaterial = new THREE.MeshBasicMaterial({
-  color: debug.sphereColor,
+const sphereMaterial = new THREE.MeshToonMaterial({
+  //color: debug.sphereColor,
+  gradientMap,
 });
 const sphere = new THREE.Mesh(
   new THREE.SphereGeometry(0.5, 20, 20),
@@ -54,9 +193,10 @@ const sphere = new THREE.Mesh(
 
 const box = new THREE.Mesh(
   new THREE.BoxGeometry(1, 1, 1, 4, 4),
-  new THREE.MeshBasicMaterial({
+  new THREE.MeshLambertMaterial({
+    //  gradientmap: gradientMap,
     color: "red",
-    wireframe: true,
+    //wireframe: true,
   })
 );
 box.scale.set(0.5, 0.5, 0.5);
@@ -70,8 +210,8 @@ const torus = new THREE.Mesh(
     debug.torusSubdivisions,
     debug.torusArc
   ),
-  new THREE.MeshBasicMaterial({
-    color: "yellow",
+  new THREE.MeshNormalMaterial({
+    //color: "yellow",
     // wireframe: true,
   })
 );
@@ -146,6 +286,7 @@ renderer.setSize(sizes.width, sizes.height);
 
 let now = Date.now();
 let clock = new THREE.Clock();
+let newNow = 0;
 
 //gui events
 window.addEventListener("keydown", (e) => {
@@ -158,7 +299,8 @@ window.addEventListener("keydown", (e) => {
 //animation
 const tick = () => {
   //using date object (native js)
-  const deltaNow = Date.now() - now;
+  const rightNow = Date.now();
+  const deltaNow = rightNow - now;
 
   //using THREE clock
   const delta = clock.getElapsedTime();
@@ -166,15 +308,19 @@ const tick = () => {
   //modify position
   sphere.position.set(
     0,
-    Math.cos(/*delta*/ (deltaNow * Math.PI) / 2000) * 2,
-    Math.sin(/*delta*/ (deltaNow * Math.PI) / 2000) * 2
+    Math.cos(delta /*deltaNow*/ * Math.PI * 0.5) * 2,
+    Math.sin(delta /*deltaNow*/ * Math.PI * 0.5) * 2
   );
 
+  //box.rotateY(Math.cos(delta) * Math.PI * 0.05);
+  box.rotation.y = delta;
+  //console.log(clock.getDelta());
+  newNow = delta;
   //native js controls
   // camera.position.set(
-  //   Math.cos(Math.PI * cursor.x * 2) * 2,
-  //   camera.position.y,
-  //   Math.sin(Math.PI * cursor.y * 2) * 2
+  //   0,
+  //   Math.cos(/*delta*/ (deltaNow * Math.PI) / 2000) * 2,
+  //   Math.sin(/*delta*/ (deltaNow * Math.PI) / 2000) * 2
   // );
   // camera.lookAt(group.position);
 
